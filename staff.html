@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Staff Panel</title>
+<style>
+body { font-family: Arial; max-width: 500px; margin: 20px auto; padding: 10px; }
+.item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #ddd; }
+button { padding: 10px 20px; font-size: 16px; margin: 5px; cursor: pointer; }
+</style>
+</head>
+
+<body>
+
+<h2>Staff Panel</h2>
+
+<p id="nowServing">Now Serving: --</p>
+
+<button onclick="nextToken()">Next Token</button>
+<button onclick="resetTokens()">Reset Queue</button>
+
+<h3>Menu Stock Control</h3>
+
+<div id="menuContainer">Loading...</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getDatabase, ref, onValue, get, set } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBr5rJ6ivj13MMHZr6wcbpfrqx4HtiF7x0",
+  authDomain: "canteen-token-system-f0184.firebaseapp.com",
+  databaseURL: "https://canteen-token-system-f0184-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "canteen-token-system-f0184",
+  storageBucket: "canteen-token-system-f0184.firebasestorage.app",
+  messagingSenderId: "820403406806",
+  appId: "1:820403406806:web:ba47e152cf5b6e8db44677"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const currentServingRef = ref(db, "tokens/currentServing");
+
+onValue(currentServingRef, (snapshot) => {
+    document.getElementById("nowServing").textContent =
+        "Now Serving: " + snapshot.val();
+});
+
+window.nextToken = async function () {
+    const snapshot = await get(currentServingRef);
+
+    await set(currentServingRef, (snapshot.val() || 0) + 1);
+};
+
+window.resetTokens = async function () {
+    await set(currentServingRef, 0);
+    await set(ref(db, "tokens/lastIssued"), 0);
+};
+
+// ---- Menu stock toggles ----
+
+const menuRef = ref(db, "menu");
+
+onValue(menuRef, (snapshot) => {
+
+    const items = snapshot.val();
+
+    const container = document.getElementById("menuContainer");
+
+    container.innerHTML = "";
+
+    for (const key in items) {
+
+        const item = items[key];
+
+        const row = document.createElement("div");
+
+        row.className = "item";
+
+        row.innerHTML =
+            `<span>${item.name} (${item.category})</span>
+            <label>
+            <input type="checkbox"
+            ${item.inStock ? "checked" : ""}
+            onchange="toggleStock('${key}', this.checked)">
+            In Stock
+            </label>`;
+
+        container.appendChild(row);
+    }
+});
+
+window.toggleStock = async function (itemKey, value) {
+
+    await set(
+        ref(db, "menu/" + itemKey + "/inStock"),
+        value
+    );
+};
+
+</script>
+
+</body>
+</html>

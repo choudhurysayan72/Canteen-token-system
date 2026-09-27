@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canteen Token System</title>
+</head>
+
+<body>
+
+    <h1>Canteen Token System</h1>
+
+    <h2>Menu</h2>
+    <div id="menuContainer">
+        Loading menu...
+    </div>
+
+    <hr>
+
+    <h2>Your Token</h2>
+    <h1 id="myToken">-</h1>
+
+    <button id="getToken">Get Token</button>
+
+    <h2>Now Serving</h2>
+    <h1 id="nowServing">0</h1>
+
+    <p id="waitTime"></p>
+
+</body>
+<script type="module">
+    
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  import { getDatabase, ref, onValue, get, set } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBr5rJ6ivj13MMHZr6wcbpfrqx4HtiF7x0",
+    authDomain: "canteen-token-system-f0184.firebaseapp.com",
+    databaseURL: "https://canteen-token-system-f0184-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "canteen-token-system-f0184",
+    storageBucket: "canteen-token-system-f0184.firebasestorage.app",
+    messagingSenderId: "820403406806",
+    appId: "1:820403406806:web:ba47e152cf5b6e8db44677"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  // ---- Load and display the menu, grouped by category ---
+const menuRef = ref(db, "menu");
+
+onValue(menuRef, (snapshot) => {
+    const items = snapshot.val();
+    const container = document.getElementById("menuContainer");
+    container.innerHTML = "";
+
+    const categories = {};
+
+    // group items by category
+    for (const key in items) {
+        const item = items[key];
+
+        if (!categories[item.category])
+            categories[item.category] = [];
+
+        categories[item.category].push(item);
+    }
+
+    for (const cat in categories) {
+        const catDiv = document.createElement("div");
+        catDiv.className = "category";
+        catDiv.textContent = cat;
+        container.appendChild(catDiv);
+
+        categories[cat].forEach((item) => {
+            const row = document.createElement("div");
+            row.className = "item" + (item.inStock ? "" : " soldout");
+
+            row.innerHTML =
+                `<span>${item.name} - Rs.${item.price}</span>` +
+                (item.inStock ? "" : '<span class="badge">Sold Out</span>');
+
+            container.appendChild(row);
+        });
+    }
+});
+// ---- Live "Now Serving" display + live wait-time updates ---
+let myTokenNumber = null;
+
+// stores your token once you book one
+function updateMyWaitDisplay(currentServingValue) {
+    if (myTokenNumber === null) return;
+
+    // haven't booked a token yet
+    const tokensAhead = myTokenNumber - currentServingValue;
+    const myTokenText = document.getElementById("myToken");
+
+    if (tokensAhead <= 0) {
+        myTokenText.textContent =
+            "Your Token: " + myTokenNumber + " — It's your turn now!";
+
+            document.getElementById("waitTime").textContent =
+    "Waiting time: 0 min";
+    } else {
+        const estWait = tokensAhead * 2;
+
+        document.getElementById("waitTime").textContent =
+    "Waiting time: ~" + estWait + " min";
+
+        // 2 min per token, adjust as needed
+        myTokenText.textContent =
+            "Your Token: " + myTokenNumber +
+            " (" + tokensAhead +
+            " ahead — Est. wait: ~" + estWait + " min)";
+    }
+}
+
+const currentServingRef = ref(db, "tokens/currentServing");
+
+onValue(currentServingRef, (snapshot) => {
+    const currentServingValue = snapshot.val();
+
+    document.getElementById("nowServing").textContent =
+        "Now Serving: " + currentServingValue;
+
+    updateMyWaitDisplay(currentServingValue);
+    // recalculate wait time live
+});
+// ---- Get a new token ---
+window.getToken = async function () {
+    const lastIssuedRef = ref(db, "tokens/lastIssued");
+
+    const snapshot = await get(lastIssuedRef);
+
+    const newToken = (snapshot.val() || 0) + 1;
+
+    await set(lastIssuedRef, newToken);
+
+    myTokenNumber = newToken;
+    // remember this token for live updates
+
+    const currentServingSnap = await get(currentServingRef);
+
+    updateMyWaitDisplay(currentServingSnap.val() || 0);
+};
+
+document.getElementById("getToken").onclick = getToken;
+
+</script>
+</html>
